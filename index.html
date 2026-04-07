@@ -96,6 +96,13 @@ body{font-family:'Malgun Gothic',sans-serif;background:#0f1117;color:#e0e0e0;}
 .empty-msg{text-align:center;color:#4b5060;font-size:13px;padding:32px 0;}
 .loading{text-align:center;color:#6b7280;font-size:13px;padding:32px 0;}
 .sync-indicator{font-size:10px;color:#3ecf8e;margin-left:8px;}
+.sort-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.sort-btn{font-size:11px;padding:4px 12px;border-radius:12px;background:#1e2235;border:1px solid #3a3e4a;color:#9aa0b0;cursor:pointer;}
+.sort-btn:hover{border-color:#5b6ef5;color:#7c8cf8;}
+.sort-btn.active{background:#1e2a4a;border-color:#5b6ef5;color:#7c8cf8;}
+.sort-btn .arrow{margin-left:4px;font-size:10px;}
+.task-table th.sortable{cursor:pointer;user-select:none;}
+.task-table th.sortable:hover{color:#7c8cf8;}
 </style>
 </head>
 <body>
@@ -137,6 +144,12 @@ body{font-family:'Malgun Gothic',sans-serif;background:#0f1117;color:#e0e0e0;}
         <span style="font-size:11px;color:#6b7280;">필터:</span>
         <span id="active-filter-tags"></span>
         <span class="filter-clear" onclick="clearAllFilters()">✕ 전체 보기</span>
+      </div>
+      <div class="sort-bar">
+        <span style="font-size:11px;color:#6b7280;">정렬:</span>
+        <button class="sort-btn" id="sort-date-btn" onclick="toggleSort('date')">📅 기한순 <span class="arrow" id="sort-date-arrow"></span></button>
+        <button class="sort-btn" id="sort-priority-btn" onclick="toggleSort('priority')">🔴 우선순위 <span class="arrow" id="sort-priority-arrow"></span></button>
+        <button class="sort-btn" id="sort-both-btn" onclick="toggleSort('both')">⚡ 기한+우선순위 <span class="arrow" id="sort-both-arrow"></span></button>
       </div>
       <div class="search-bar">
         <span style="font-size:12px;color:#4b5060;">⌕</span>
@@ -235,6 +248,7 @@ let editMode=false;
 let filterStatus=null;
 let filterMember=null;
 let searchQuery="";
+let sortMode=null; // 'date' | 'priority' | 'both' | null
 
 const today=new Date();
 document.getElementById("today-date").textContent=`${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
@@ -393,6 +407,37 @@ function clearAllFilters(){
   renderAll();
 }
 
+function toggleSort(mode){
+  sortMode=(sortMode===mode)?null:mode;
+  // 버튼 UI 업데이트
+  ['date','priority','both'].forEach(m=>{
+    const btn=document.getElementById(`sort-${m}-btn`);
+    const arrow=document.getElementById(`sort-${m}-arrow`);
+    if(sortMode===m){btn.classList.add('active');arrow.textContent='↑';}
+    else{btn.classList.remove('active');arrow.textContent='';}
+  });
+  applyFilters();
+}
+
+function sortTasks(list){
+  if(!sortMode)return list;
+  const priorityVal=p=>p==="높음"?0:1;
+  return [...list].sort((a,b)=>{
+    if(sortMode==='date'){
+      return new Date(a.date)-new Date(b.date);
+    }
+    if(sortMode==='priority'){
+      return priorityVal(a.priority)-priorityVal(b.priority);
+    }
+    if(sortMode==='both'){
+      const dateDiff=new Date(a.date)-new Date(b.date);
+      if(dateDiff!==0)return dateDiff;
+      return priorityVal(a.priority)-priorityVal(b.priority);
+    }
+    return 0;
+  });
+}
+
 function applyFilters(){
   const inp=document.querySelector(".search-bar input");
   searchQuery=inp?inp.value.toLowerCase():"";
@@ -406,6 +451,7 @@ function applyFilters(){
     if(searchQuery&&!(t.name.toLowerCase().includes(searchQuery)||(t.sub||"").toLowerCase().includes(searchQuery)||(t.assignees||[]).some(a=>a.includes(searchQuery))))return false;
     return true;
   });
+  list=sortTasks(list);
   renderTasks(list);
   renderFilterBar();
   renderStats();
